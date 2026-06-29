@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Rafiki voice local assets and outputs
+.venv/
+**/__pycache__/
+.env
+models/
+outputs/
+*.wav
