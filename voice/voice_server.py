@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException
 
 from .config import settings
-from .llm_client import chat_with_gemma
+from .llm_client import chat_with_local_model, get_llm_model_label, get_llm_provider
 from .schemas import (
     ChatRequest,
     ChatResponse,
@@ -21,7 +21,7 @@ from .voice_pipeline import is_llm_error, voice_chat
 
 app = FastAPI(
     title="Rafiki Voice Module",
-    description="Serveur local pour faire parler, ecouter et connecter Rafiki a Gemma via Ollama",
+    description="Serveur local pour faire parler, ecouter et connecter Rafiki a LM Studio ou Ollama",
     version="0.1.0",
 )
 
@@ -33,7 +33,8 @@ def health_check():
         "service": "Rafiki Voice Module",
         "status": "running",
         "default_language": settings.default_language,
-        "ollama_model": settings.ollama_model,
+        "llm_provider": get_llm_provider(),
+        "llm_model": get_llm_model_label(),
     }
 
 
@@ -73,7 +74,7 @@ def listen_endpoint(payload: ListenRequest):
 @app.post("/chat", response_model=ChatResponse)
 def chat_endpoint(payload: ChatRequest):
     try:
-        response_text = chat_with_gemma(
+        response_text = chat_with_local_model(
             payload.text,
             payload.language,
             payload.system_prompt,
@@ -81,7 +82,7 @@ def chat_endpoint(payload: ChatRequest):
         return ChatResponse(
             ok=bool(response_text) and not is_llm_error(response_text),
             response=response_text,
-            model=settings.ollama_model,
+            model=get_llm_model_label(),
         )
     except Exception as error:
         raise HTTPException(
