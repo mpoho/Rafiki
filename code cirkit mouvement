@@ -1,0 +1,129 @@
+#include <ESP32Servo.h>
+#include <math.h>
+
+// --- Configuration Matérielle (Pins d'après ton schéma) ---
+#define PIN_YL 4   // Jambe Gauche
+#define PIN_YR 5   // Jambe Droite
+#define PIN_RL 6   // Pied Gauche
+#define PIN_RR 7   // Pied Droite
+#define PIN_TRIG 15 // Trig Capteur Distance
+#define PIN_ECHO 16 // Echo Capteur Distance
+
+// --- Variables Globales ---
+Servo servo_yl; Servo servo_yr; Servo servo_rl; Servo servo_rr;
+int angles_initiaux[4] = {90, 90, 90, 90}; 
+
+// Prototypes
+void marcher_canard(int pas, int t_cycle);
+void danser_shake(int pas, int t_cycle);
+void stopper_moteurs();
+long lire_distance_cm();
+
+void setup() {
+  // Initialisation de la console de simulation à 115200 bauds
+  Serial.begin(115200);
+  delay(1000);
+  
+  Serial.println("--- SYSTEME INTERACTIF PRET ---");
+  Serial.println("Commandes disponibles : WALK_FORWARD , DANCE_HAPPY , STOP");
+  
+  pinMode(PIN_TRIG, OUTPUT);
+  pinMode(PIN_ECHO, INPUT);
+
+  // Allocation des Timers PWM pour l'ESP32-S3
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  
+  servo_yl.setPeriodHertz(50);
+  servo_yr.setPeriodHertz(50);
+  servo_rl.setPeriodHertz(50);
+  servo_rr.setPeriodHertz(50);
+
+  servo_yl.attach(PIN_YL, 500, 2400);
+  servo_yr.attach(PIN_YR, 500, 2400);
+  servo_rl.attach(PIN_RL, 500, 2400);
+  servo_rr.attach(PIN_RR, 500, 2400);
+  
+  stopper_moteurs(); 
+}
+
+void loop() {
+  // --- 1. ÉCOUTE DE LA CONSOLE (Ordres direct du simulateur) ---
+  if (Serial.available() > 0) {
+    String commande = Serial.readStringUntil('\n');
+    commande.trim(); // Supprime les espaces ou retours à la ligne cachés
+
+    Serial.print("Commande executee : ");
+    Serial.println(commande);
+
+    if (commande == "WALK_FORWARD") {
+      marcher_canard(4, 1200);
+    } 
+    else if (commande == "DANCE_HAPPY") {
+      danser_shake(3, 1000);
+    } 
+    else if (commande == "STOP") {
+      stopper_moteurs();
+    } else {
+      Serial.println("Commande inconnue !");
+    }
+  }
+
+  // --- 2. SÉCURITÉ ANTI-CHUTE ---
+  long distance = lire_distance_cm();
+  if (distance > 30 && distance < 400) { 
+    stopper_moteurs();
+    Serial.println("[ALERTE SECOURS] Vide detecte ! Arret des moteurs.");
+    delay(1500); 
+  }
+}
+
+void stopper_moteurs() {
+  servo_yl.write(angles_initiaux[0]);
+  servo_yr.write(angles_initiaux[1]);
+  servo_rl.write(angles_initiaux[2]);
+  servo_rr.write(angles_initiaux[3]);
+}
+
+void marcher_canard(int pas, int t_cycle) {
+  for (int p = 0; p < pas; p++) {
+    unsigned long temps_depart = millis();
+    while (millis() - temps_depart < (unsigned long)t_cycle) {
+      float t = (float)(millis() - temps_depart) / t_cycle;
+      int amplitude_jambe = 22; 
+      int amplitude_pied = 26;
+      float phi = t * 2 * M_PI; 
+      
+      servo_yl.write(angles_initiaux[0] + amplitude_jambe * sin(phi));
+      servo_yr.write(angles_initiaux[1] + amplitude_jambe * sin(phi));
+      servo_rl.write(angles_initiaux[2] + amplitude_pied * cos(phi));
+      servo_rr.write(angles_initiaux[3] + amplitude_pied * cos(phi));
+      delay(15); 
+    }
+  }
+  stopper_moteurs();
+}
+
+void danser_shake(int pas, int t_cycle) {
+  for (int p = 0; p < pas; p++) {
+    servo_rl.write(115); servo_rr.write(115);
+    delay(t_cycle / 4);
+    servo_yr.write(110);
+    delay(t_cycle / 8);
+    servo_yr.write(70);
+    delay(t_cycle / 8);
+    stopper_moteurs();
+    delay(100);
+  }
+}
+
+long lire_distance_cm() {
+  digitalWrite(PIN_TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(PIN_TRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(PIN_TRIG, LOW);
+  long duree = pulseIn(PIN_ECHO, HIGH, 25000); 
+  long distance = duree * 0.034 / 2;
+  return (distance == 0) ? 999 : distance; 
+}
