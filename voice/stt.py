@@ -46,6 +46,7 @@ def listen(language: str = "fr", timeout_seconds: int | None = None) -> str:
 
     audio_queue: queue.Queue[bytes] = queue.Queue()
     recognizer = KaldiRecognizer(model, settings.vosk_sample_rate)
+    recognizer.SetWords(True)
 
     def audio_callback(indata, frames, callback_time, status):
         if status:
@@ -53,19 +54,22 @@ def listen(language: str = "fr", timeout_seconds: int | None = None) -> str:
         audio_queue.put(bytes(indata))
 
     recognized_parts: list[str] = []
+    last_partial = ""
 
     try:
         with sd.RawInputStream(
             samplerate=settings.vosk_sample_rate,
-            blocksize=8000,
+            blocksize=4000,
             dtype="int16",
             channels=1,
             callback=audio_callback,
         ):
+            # Laisse le micro se stabiliser avant de compter le temps d'ecoute.
+            time.sleep(0.5)
             deadline = time.monotonic() + timeout
 
             while time.monotonic() < deadline:
-                remaining = max(0.05, min(0.25, deadline - time.monotonic()))
+                remaining = max(0.05, min(0.5, deadline - time.monotonic()))
 
                 try:
                     data = audio_queue.get(timeout=remaining)
@@ -77,15 +81,43 @@ def listen(language: str = "fr", timeout_seconds: int | None = None) -> str:
                     text = result.get("text", "").strip()
                     if text:
                         recognized_parts.append(text)
+                else:
+                    partial_result = json.loads(recognizer.PartialResult())
+                    partial_text = partial_result.get("partial", "").strip()
+                    if partial_text:
+                        last_partial = partial_text
+
+            partial_result = json.loads(recognizer.PartialResult())
+            partial_text = partial_result.get("partial", "").strip()
+            if partial_text:
+                last_partial = partial_text
 
             final_result = json.loads(recognizer.FinalResult())
             final_text = final_result.get("text", "").strip()
             if final_text:
                 recognized_parts.append(final_text)
+            elif last_partial:
+                recognized_parts.append(last_partial)
 
     except Exception as exc:
         raise RuntimeError(
             f"Erreur microphone : impossible d'ecouter pendant {timeout} s. {exc}"
         ) from exc
 
-    return " ".join(recognized_parts).strip()
+    return _dedupe_transcript(" ".join(recognized_parts).strip())
+
+
+def _dedupe_transcript(text: str) -> str:
+    if not text:
+        return ""
+
+    words = text.split()
+    if not words:
+        return ""
+
+    deduped: list[str] = []
+    for word in words:
+        if not deduped or deduped[-1].lower() != word.lower():
+            deduped.append(word)
+
+    return " ".join(deduped)

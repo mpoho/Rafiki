@@ -38,7 +38,7 @@ class VoiceSettings:
         "models/vosk/vosk-model-small-en-us-0.15",
     )
     vosk_sample_rate: int = _env_int("VOSK_SAMPLE_RATE", 16000)
-    listen_timeout_seconds: int = _env_int("LISTEN_TIMEOUT_SECONDS", 7)
+    listen_timeout_seconds: int = _env_int("LISTEN_TIMEOUT_SECONDS", 8)
     piper_voice_fr_path: str = _env_str(
         "PIPER_VOICE_FR_PATH",
         "models/piper/fr/fr_FR-upmc-medium.onnx",
@@ -47,6 +47,11 @@ class VoiceSettings:
         "PIPER_VOICE_EN_PATH",
         "models/piper/en/en_US-lessac-medium.onnx",
     )
+    llm_provider: str = _env_str("LLM_PROVIDER", "lmstudio")
+    llm_timeout_seconds: int = _env_int("LLM_TIMEOUT_SECONDS", 60)
+    llm_max_tokens: int = _env_int("LLM_MAX_TOKENS", 120)
+    lmstudio_base_url: str = _env_str("LM_STUDIO_BASE_URL", "http://localhost:1234/v1")
+    lmstudio_model: str = _env_str("LM_STUDIO_MODEL", "")
     ollama_base_url: str = _env_str("OLLAMA_BASE_URL", "http://localhost:11434")
     ollama_model: str = _env_str("OLLAMA_MODEL", "gemma4")
     audio_output_dir: str = _env_str("AUDIO_OUTPUT_DIR", "outputs/audio")
