@@ -97,6 +97,7 @@ export default function KinOpereFace({
   const [displayText, setDisplayText] = useState('HI');
   const [displayImageUrl, setDisplayImageUrl] = useState('');
   const [inputTextVal, setInputTextVal] = useState('6x6=32');
+  const [inputImageUrlVal, setInputImageUrlVal] = useState('education_graphic.jpg');
 
   const [mqttConnected, setMqttConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState('Aucun');
@@ -360,9 +361,11 @@ export default function KinOpereFace({
   };
 
   const sendLocalImage = () => {
-    setCurrentView('image');
-    setDisplayImageUrl('education_graphic.jpg');
-    publishCommand(displayTopic, JSON.stringify({ type: 'image', url: 'education_graphic.jpg' }));
+    if (inputImageUrlVal.trim()) {
+      setCurrentView('image');
+      setDisplayImageUrl(inputImageUrlVal.trim());
+      publishCommand(displayTopic, JSON.stringify({ type: 'image', url: inputImageUrlVal.trim() }));
+    }
   };
 
   const restoreLocalEyes = () => {
@@ -543,7 +546,7 @@ export default function KinOpereFace({
 
         {/* Section Apprentissage (Texte / Image) */}
         <div className="emotion-select-label" style={{ marginTop: '12px', marginBottom: '6px' }}>Apprentissage Interactif (Texte / Image)</div>
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
           <input 
             type="text" 
             value={inputTextVal} 
@@ -553,8 +556,17 @@ export default function KinOpereFace({
           />
           <button onClick={sendLocalText} className="btn-control" style={{ background: preset.accent, color: 'white', border: 'none', padding: '0 16px' }}>Envoyer Texte</button>
         </div>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <input 
+            type="text" 
+            value={inputImageUrlVal} 
+            onChange={(e) => setInputImageUrlVal(e.target.value)}
+            placeholder="Lien ou nom de l'image (ex: 'education_graphic.jpg')" 
+            style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '12px' }}
+          />
+          <button onClick={sendLocalImage} className="btn-control" style={{ background: '#10b981', color: 'white', border: 'none', padding: '0 16px' }}>Afficher l'Image</button>
+        </div>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
-          <button onClick={sendLocalImage} className="btn-control" style={{ flex: 1, background: '#10b981', color: 'white', border: 'none' }}>Afficher Image Éducative</button>
           <button onClick={restoreLocalEyes} className="btn-control" style={{ flex: 1 }}>Restaurer les Yeux</button>
         </div>
 
