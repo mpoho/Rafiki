@@ -133,12 +133,15 @@
 
         <!-- Section d'Apprentissage : Affichage Texte / Image -->
         <div class="emotion-select-label" style="margin-top: 12px; margin-bottom: 6px;">Apprentissage Interactif (Texte / Image)</div>
-        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
           <input type="text" id="input-display-text" placeholder="Entrez un texte (ex: '6x6=32', 'kitchen')" style="flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; outline: none; font-size: 12px;" value="6x6=32">
           <button id="btn-send-text" class="btn-control" style="background: var(--accent); color: white; border: none; padding: 0 16px;">Envoyer Texte</button>
         </div>
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+          <input type="text" id="input-display-image" placeholder="Lien ou nom de l'image (ex: 'education_graphic.jpg')" style="flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; outline: none; font-size: 12px;" value="education_graphic.jpg">
+          <button id="btn-send-image" class="btn-control" style="background: #10b981; color: white; border: none; padding: 0 16px;">Afficher l'Image</button>
+        </div>
         <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center;">
-          <button id="btn-send-image" class="btn-control" style="flex: 1; background: #10b981; color: white; border: none;">Afficher Image Éducative</button>
           <button id="btn-restore-eyes" class="btn-control" style="flex: 1;">Restaurer les Yeux</button>
         </div>
 
@@ -286,6 +289,7 @@
     const emotionButtons = document.querySelectorAll('.emotion-grid button');
 
     const inputText = document.getElementById('input-display-text');
+    const inputImage = document.getElementById('input-display-image');
     const btnSendText = document.getElementById('btn-send-text');
     const btnSendImage = document.getElementById('btn-send-image');
     const btnRestoreEyes = document.getElementById('btn-restore-eyes');
@@ -649,9 +653,11 @@
     });
 
     btnSendImage.addEventListener('click', () => {
-      // Affiche l'image d'éducation copiée localement
-      showImage('education_graphic.jpg');
-      publish(displayTopic, JSON.stringify({ type: 'image', url: 'education_graphic.jpg' }));
+      const imageUrl = inputImage.value.trim();
+      if (imageUrl) {
+        showImage(imageUrl);
+        publish(displayTopic, JSON.stringify({ type: 'image', url: imageUrl }));
+      }
     });
 
     btnRestoreEyes.addEventListener('click', () => {
