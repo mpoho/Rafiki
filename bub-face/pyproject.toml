@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bub-face"
+version = "0.1.0"
+description = "A web-based robo eyes demo controlled by aiohttp."
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp>=3.10",
+]
+
+[project.entry-points.bub]
+face = "bub_face.plugin"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "bub>=0.3.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+sources = ["src"]
+only-include = ["src/bub_face", "src/skills"]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/", "tests/"]
