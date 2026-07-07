@@ -1,9 +1,10 @@
 /**
  * @file rafiki_uno.ino
- * @brief Robot Humanoïde Bipède Interactif - Version Arduino Uno
+ * @brief Robot Humanoïde Bipède Interactif - Version Arduino Uno (Sans capteur de vide)
  * @author Antigravity (Principal Robotics Engineer)
  * 
  * Ce script implémente les mouvements cinématiques lissés pour Arduino Uno.
+ * Le capteur de distance HC-SR04 et la sécurité anti-chute ont été retirés.
  * Contrôle par le Moniteur Série (115200 bauds).
  * 
  * BROCHAGE ARDUINO UNO :
@@ -11,8 +12,6 @@
  *  - Pin 5 -> Servo Jambe Droite (YR)
  *  - Pin 6 -> Servo Pied Gauche (RL)
  *  - Pin 7 -> Servo Pied Droite (RR)
- *  - Pin A1 (15) -> TRIG Capteur HC-SR04
- *  - Pin A2 (16) -> ECHO Capteur HC-SR04
  */
 
 #include <Servo.h>
@@ -22,9 +21,6 @@ const int PIN_YL = 4;   // Servo Jambe Gauche
 const int PIN_YR = 5;   // Servo Jambe Droite
 const int PIN_RL = 6;   // Servo Pied Gauche
 const int PIN_RR = 7;   // Servo Pied Droite
-
-const int PIN_TRIG = A1; // HC-SR04 Trigger (A1 = Pin 15 sur Uno)
-const int PIN_ECHO = A2; // HC-SR04 Echo (A2 = Pin 16 sur Uno)
 
 // --- Calibrage Matériel ---
 // Angles de départ (calibrage) fixés à 0 degré
@@ -87,19 +83,9 @@ const unsigned long DANCE_STEP_DURATION = 3000;
 unsigned long lastServoUpdateTime = 0;
 float currentAngles[4] = {0.0f, 0.0f, 0.0f, 0.0f}; // Positions réelles des servos (démarrent à 0)
 
-unsigned long lastUltrasonicTime = 0;
-const unsigned long ULTRASONIC_INTERVAL = 100; // Intervalle de mesure (100ms)
-float currentDistance = 0.0f;
-bool cliffDetected = false;
-
 void setup() {
   Serial.begin(115200);
-  Serial.println(F("=== KIN OPERE - ARDUINO UNO INITIALIZATION ==="));
-
-  // Configuration E/S Capteur Ultrasons
-  pinMode(PIN_TRIG, OUTPUT);
-  pinMode(PIN_ECHO, INPUT);
-  digitalWrite(PIN_TRIG, LOW);
+  Serial.println(F("=== KIN OPERE - ARDUINO UNO INITIALIZATION (NO SENSOR) ==="));
 
   // Attachement des Servos sur Arduino Uno
   servoYL.attach(PIN_YL);
@@ -127,17 +113,14 @@ void setup() {
 }
 
 void loop() {
-  // 1. Surveillance de la sécurité anti-chute
-  checkCliffDistance();
-
-  // 2. Lecture des commandes du moniteur série
+  // 1. Lecture des commandes du moniteur série
   readSerialCommand();
 
-  // 3. Calcul des angles cibles
+  // 2. Calcul des angles cibles
   float targetAngles[4] = {0.0f, 0.0f, 0.0f, 0.0f};
   calculateTargetAngles(targetAngles);
 
-  // 4. Application du lissage et envoi aux servos
+  // 3. Application du lissage et envoi aux servos
   applyServoSmoothness(targetAngles);
 }
 
@@ -148,22 +131,14 @@ void readSerialCommand() {
 
     if (input.length() > 0) {
       if (input == "WALK_FORWARD") {
-        if (cliffDetected) {
-          Serial.println(F("CLIFF_DETECTED"));
-        } else {
-          currentState = STATE_WALK_FORWARD;
-          stateStartTime = millis();
-          Serial.println(F("ACK: WALK_FORWARD"));
-        }
+        currentState = STATE_WALK_FORWARD;
+        stateStartTime = millis();
+        Serial.println(F("ACK: WALK_FORWARD"));
       } 
       else if (input == "DANCE_HAPPY") {
-        if (cliffDetected) {
-          Serial.println(F("CLIFF_DETECTED"));
-        } else {
-          currentState = STATE_DANCE_HAPPY;
-          stateStartTime = millis();
-          Serial.println(F("ACK: DANCE_HAPPY"));
-        }
+        currentState = STATE_DANCE_HAPPY;
+        stateStartTime = millis();
+        Serial.println(F("ACK: DANCE_HAPPY"));
       } 
       else if (input == "STOP") {
         currentState = STATE_STOP;
@@ -174,38 +149,6 @@ void readSerialCommand() {
         Serial.print(F("Commande inconnue : "));
         Serial.println(input);
       }
-    }
-  }
-}
-
-void checkCliffDistance() {
-  unsigned long now = millis();
-  if (now - lastUltrasonicTime >= ULTRASONIC_INTERVAL) {
-    lastUltrasonicTime = now;
-
-    digitalWrite(PIN_TRIG, LOW);
-    delayMicroseconds(2);
-    digitalWrite(PIN_TRIG, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(PIN_TRIG, LOW);
-
-    // Lecture avec timeout de 5000 microsecondes (~85cm max) pour rester non-bloquant
-    long duration = pulseIn(PIN_ECHO, HIGH, 5000);
-
-    if (duration == 0) {
-      currentDistance = 999.0f;
-    } else {
-      currentDistance = (duration * 0.0343f) / 2.0f;
-    }
-
-    if (currentDistance > 30.0f) {
-      if (!cliffDetected) {
-        cliffDetected = true;
-        currentState = STATE_STOP;
-        Serial.println(F("CLIFF_DETECTED"));
-      }
-    } else {
-      cliffDetected = false;
     }
   }
 }
