@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kin Opere - AI Assistant Facial Dashboard</title>
+  <link rel="stylesheet" href="KinOpereFace.css">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body style="margin: 0; background: #e2e8f0; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; box-sizing: border-box;">
+
+  <div id="root" style="width: 100%; max-width: 800px;">
+    <!-- Visage Kin Opere -->
+    <div id="face-wrapper" class="kinopere-face-wrapper">
+      <div class="ambient-glow glow-left"></div>
+      <div class="ambient-glow glow-right"></div>
+
+      <!-- Pluie pour l'état Tristesse (SAD) -->
+      <div class="rain-container">
+        <div class="raindrop"></div>
+        <div class="raindrop"></div>
+        <div class="raindrop"></div>
+        <div class="raindrop"></div>
+        <div class="raindrop"></div>
+        <div class="raindrop"></div>
+      </div>
+
+      <!-- Sommeil Longue "Zzz" (SLEEPY) -->
+      <div class="sleepy-zzz-container">
+        <div class="zzz-char">Z</div>
+        <div class="zzz-char">z</div>
+        <div class="zzz-char">z</div>
+      </div>
+
+      <!-- Notes de Musique & Particules pour Joyeux (HAPPY) -->
+      <div class="happy-notes-container">
+        <div class="floating-note">🎵</div>
+        <div class="floating-note">🎶</div>
+        <div class="floating-note">✨</div>
+        <div class="floating-note">🎵</div>
+      </div>
+
+      <!-- Point d'interrogation pour Curieux (CURIOUS) -->
+      <div class="curious-question-container">
+        <div class="question-mark">❓</div>
+      </div>
+
+      <!-- Points de Réflexion (THINKING) -->
+      <div class="thinking-dots-container">
+        <div class="thinking-dot"></div>
+        <div class="thinking-dot"></div>
+        <div class="thinking-dot"></div>
+      </div>
+
+      <!-- Zone Écran d'affichage (Multi-Vues avec Transition Fluide) -->
+      <div class="screen-area">
+        
+        <!-- VUE 1 : Les Yeux Circulaires Expressifs -->
+        <div id="eyes-grid" class="eyes-layout screen-view active-view">
+          <!-- Oeil Gauche -->
+          <div class="eye-container" id="left-eye-container">
+            <div class="eyebrow-element" id="left-eyebrow"></div>
+            <div class="eye-core" id="left-eye-core">
+              <div class="eye-highlight large"></div>
+              <div class="eye-highlight small"></div>
+            </div>
+            <!-- Cœurs Flottants pour l'état Love -->
+            <div class="love-hearts-container">
+              <div class="floating-heart">❤️</div>
+              <div class="floating-heart">💖</div>
+              <div class="floating-heart">❤️</div>
+              <div class="floating-heart">💕</div>
+            </div>
+          </div>
+
+          <!-- Oeil Droite -->
+          <div class="eye-container" id="right-eye-container">
+            <div class="eyebrow-element" id="right-eyebrow"></div>
+            <div class="eye-core" id="right-eye-core">
+              <div class="eye-highlight large"></div>
+              <div class="eye-highlight small"></div>
+            </div>
+            <!-- Cœurs Flottants pour l'état Love -->
+            <div class="love-hearts-container">
+              <div class="floating-heart">❤️</div>
+              <div class="floating-heart">💖</div>
+              <div class="floating-heart">❤️</div>
+              <div class="floating-heart">💕</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VUE 2 : Affichage de Texte (Éducatif / Quiz) -->
+        <div id="text-view" class="text-display-view screen-view">
+          <div id="display-text-content" class="text-display-content">HI</div>
+        </div>
+
+        <!-- VUE 3 : Affichage d'Image (Reçu par l'Orchestrateur) -->
+        <div id="image-view" class="image-display-view screen-view">
+          <img id="display-image-content" class="image-display-content" src="" alt="Robot Display content" />
+        </div>
+
+      </div>
+
+      <!-- Console de Contrôle et Sélections d'Expressions -->
+      <div class="dashboard-controls">
+        <div class="status-row">
+          <div class="mqtt-status">
+            <div id="mqtt-dot" class="status-dot"></div>
+            <span id="mqtt-text">Connexion Broker...</span>
+          </div>
+
+          <div class="robot-state-label">
+            Écran : <span id="state-badge" class="state-badge">NEUTRAL</span>
+          </div>
+        </div>
+
+        <!-- Section de Sélection des Émotions -->
+        <div class="emotion-select-row">
+          <div class="emotion-select-label">Expressions du visage</div>
+          <div class="emotion-grid">
+            <button class="btn-control active-btn" data-emotion="neutral">Neutral</button>
+            <button class="btn-control" data-emotion="happy">Happy</button>
+            <button class="btn-control" data-emotion="sad">Sad</button>
+            <button class="btn-control" data-emotion="angry">Angry</button>
+            <button class="btn-control" data-emotion="surprised">Surprised</button>
+            <button class="btn-control" data-emotion="sleepy">Sleepy</button>
+            <button class="btn-control" data-emotion="curious">Curious</button>
+            <button class="btn-control" data-emotion="love">Love</button>
+            <button class="btn-control" data-emotion="thinking">Thinking</button>
+          </div>
+        </div>
+
+        <!-- Section d'Apprentissage : Affichage Texte / Image -->
+        <div class="emotion-select-label" style="margin-top: 12px; margin-bottom: 6px;">Apprentissage Interactif (Texte / Image)</div>
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+          <input type="text" id="input-display-text" placeholder="Entrez un texte (ex: '6x6=32', 'kitchen')" style="flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; outline: none; font-size: 12px;" value="6x6=32">
+          <button id="btn-send-text" class="btn-control" style="background: var(--accent); color: white; border: none; padding: 0 16px;">Envoyer Texte</button>
+        </div>
+        <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center;">
+          <button id="btn-send-image" class="btn-control" style="flex: 1; background: #10b981; color: white; border: none;">Afficher Image Éducative</button>
+          <button id="btn-restore-eyes" class="btn-control" style="flex: 1;">Restaurer les Yeux</button>
+        </div>
+
+        <!-- Section de Commandes MQTT pour le Robot -->
+        <div class="emotion-select-label" style="margin-top: 10px; margin-bottom: 6px;">Contrôle Robotique (MQTT)</div>
+        <div class="button-grid">
+          <button id="btn-walk" class="btn-control">Avancer (Walk)</button>
+          <button id="btn-dance" class="btn-control">Danser (Happy)</button>
+          <button id="btn-stop" class="btn-control">Arrêt (Stop)</button>
+          <button id="btn-clear-cliff" class="btn-control btn-stop" disabled>Acquitter Alerte Chute</button>
+        </div>
+
+        <div style="margin-top: 14px; font-size: 11px; color: #64748b; text-align: center;">
+          Dernier payload MQTT : <strong id="last-message" style="color: #94a3b8;">"Aucun"</strong>
+        </div>
+
+        <div id="connection-error" class="cliff-warning-text" style="font-size: 11px; display: none;"></div>
+        <div id="cliff-warning" class="cliff-warning-text" style="display: none;">
+          ⚠️ ARRÊT URGENCE : Vide détecté (&gt; 30 cm) par l'ESP32-S3 !
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+  <script>
+    const controlTopic = 'kinopere/robot/control';
+    const displayTopic = 'kinopere/robot/display';
+    const statusTopic = 'kinopere/robot/status';
+    const brokerUrl = 'ws://broker.hivemq.com:8000/mqtt';
+
+    const EMOTIONS = {
+      neutral: {
+        openness: 1.0, pupil_size: 0.38, brow_tilt: 0.0, eyelid_curve: 0.05, glow: 0.45, blink_interval: 3.8,
+        accent: "#0ea5e9", background: "#ffffff", spark: "#e0f2fe",
+        width: 138, height: 168, openScale: 1, widthScale: 1, slant: 4, leftTop: 16, rightTop: 84, leftBottom: 14, rightBottom: 86,
+        topInset: 0, bottomInset: 0, sideTop: 18, sideBottom: 82, radiusTopOuter: 24, radiusTopInner: 24, radiusBottomOuter: 22, radiusBottomInner: 22
+      },
+      happy: {
+        openness: 0.82, pupil_size: 0.34, brow_tilt: -0.18, eyelid_curve: 0.34, glow: 0.7, blink_interval: 2.8,
+        accent: "#22c55e", background: "#ffffff", spark: "#dcfce7",
+        width: 144, height: 156, openScale: 0.92, widthScale: 1.08, slant: 12, leftTop: 12, rightTop: 88, leftBottom: 10, rightBottom: 90,
+        topInset: 10, bottomInset: 0, sideTop: 24, sideBottom: 82, radiusTopOuter: 34, radiusTopInner: 34, radiusBottomOuter: 18, radiusBottomInner: 18
+      },
+      sad: {
+        openness: 0.62, pupil_size: 0.36, brow_tilt: 0.2, eyelid_curve: -0.22, glow: 0.3, blink_interval: 5.2,
+        accent: "#3b82f6", background: "#ffffff", spark: "#dbeafe",
+        width: 140, height: 150, openScale: 0.88, widthScale: 1, slant: -10, leftTop: 14, rightTop: 86, leftBottom: 8, rightBottom: 92,
+        topInset: 6, bottomInset: 6, sideTop: 18, sideBottom: 88, radiusTopOuter: 18, radiusTopInner: 30, radiusBottomOuter: 24, radiusBottomInner: 20
+      },
+      angry: {
+        openness: 0.72, pupil_size: 0.3, brow_tilt: 0.42, eyelid_curve: -0.1, glow: 0.78, blink_interval: 2.3,
+        accent: "#ef4444", background: "#ffffff", spark: "#fee2e2",
+        width: 150, height: 128, openScale: 0.8, widthScale: 1.12, slant: 20, leftTop: 8, rightTop: 92, leftBottom: 20, rightBottom: 80,
+        topInset: 8, bottomInset: 8, sideTop: 18, sideBottom: 82, radiusTopOuter: 12, radiusTopInner: 12, radiusBottomOuter: 22, radiusBottomInner: 22
+      },
+      surprised: {
+        openness: 1.0, pupil_size: 0.26, brow_tilt: -0.28, eyelid_curve: 0.02, glow: 0.88, blink_interval: 4.6,
+        accent: "#eab308", background: "#ffffff", spark: "#fef9c3",
+        width: 130, height: 178, openScale: 1.08, widthScale: 0.96, slant: 0, leftTop: 18, rightTop: 82, leftBottom: 18, rightBottom: 82,
+        topInset: 0, bottomInset: 0, sideTop: 14, sideBottom: 86, radiusTopOuter: 30, radiusTopInner: 30, radiusBottomOuter: 30, radiusBottomInner: 30
+      },
+      sleepy: {
+        openness: 0.34, pupil_size: 0.42, brow_tilt: 0.08, eyelid_curve: -0.28, glow: 0.24, blink_interval: 1.8,
+        accent: "#a855f7", background: "#ffffff", spark: "#f3e8ff",
+        width: 164, height: 76, openScale: 0.58, widthScale: 1.14, slant: 0, leftTop: 14, rightTop: 86, leftBottom: 14, rightBottom: 86,
+        topInset: 22, bottomInset: 22, sideTop: 34, sideBottom: 66, radiusTopOuter: 24, radiusTopInner: 24, radiusBottomOuter: 24, radiusBottomInner: 24
+      },
+      curious: {
+        openness: 0.94, pupil_size: 0.33, brow_tilt: -0.08, eyelid_curve: 0.12, glow: 0.6, blink_interval: 3.1,
+        accent: "#06b6d4", background: "#ffffff", spark: "#ecfeff",
+        width: 148, height: 152, openScale: 0.96, widthScale: 1.04, slant: 8, leftTop: 18, rightTop: 82, leftBottom: 12, rightBottom: 88,
+        topInset: 4, bottomInset: 0, sideTop: 20, sideBottom: 84, radiusTopOuter: 22, radiusTopInner: 28, radiusBottomOuter: 18, radiusBottomInner: 18
+      },
+      love: {
+        openness: 0.86, pupil_size: 0.28, brow_tilt: -0.22, eyelid_curve: 0.28, glow: 0.82, blink_interval: 2.6,
+        accent: "#ec4899", background: "#ffffff", spark: "#fce7f3",
+        width: 144, height: 148, openScale: 0.9, widthScale: 1.06, slant: 6, leftTop: 16, rightTop: 84, leftBottom: 10, rightBottom: 90,
+        topInset: 6, bottomInset: 6, sideTop: 22, sideBottom: 84, radiusTopOuter: 28, radiusTopInner: 28, radiusBottomOuter: 26, radiusBottomInner: 26
+      },
+      thinking: {
+        openness: 0.78, pupil_size: 0.32, brow_tilt: 0.12, eyelid_curve: 0.0, glow: 0.52, blink_interval: 4.3,
+        accent: "#10b981", background: "#ffffff", spark: "#d1fae5",
+        width: 152, height: 118, openScale: 0.76, widthScale: 1.18, slant: 10, leftTop: 14, rightTop: 86, leftBottom: 8, rightBottom: 92,
+        topInset: 18, bottomInset: 12, sideTop: 28, sideBottom: 74, radiusTopOuter: 18, radiusTopInner: 18, radiusBottomOuter: 18, radiusBottomInner: 18
+      }
+    };
+
+    const EYEBROW_PRESETS = {
+      neutral: { leftY: 0, rightY: 0, leftRot: 0, rightRot: 0 },
+      happy: { leftY: -10, rightY: -10, leftRot: -8, rightRot: 8 },
+      sad: { leftY: 5, rightY: 5, leftRot: -15, rightRot: 15 },
+      angry: { leftY: 8, rightY: 8, leftRot: 18, rightRot: -18 },
+      surprised: { leftY: -18, rightY: -18, leftRot: -3, rightRot: 3 },
+      sleepy: { leftY: 6, rightY: 6, leftRot: 0, rightRot: 0 },
+      curious: { leftY: -10, rightY: 2, leftRot: -10, rightRot: 6 },
+      love: { leftY: -9, rightY: -9, leftRot: -6, rightRot: 6 },
+      thinking: { leftY: -5, rightY: 6, leftRot: -5, rightRot: -12 }
+    };
+
+    // État Local
+    let state = {
+      emotion: 'neutral',
+      openness: 1.0,
+      pupil_size: 0.38,
+      pupil_x: 0.0,
+      pupil_y: 0.0,
+      brow_tilt: 0.0,
+      eyelid_curve: 0.05,
+      glow: 0.45,
+      blink_interval: 3.8,
+      background: "#ffffff",
+      accent: EMOTIONS.neutral.accent,
+      spark: EMOTIONS.neutral.spark
+    };
+
+    let isWalking = false;
+    let isDancing = false;
+    let walkTimer = null;
+    let danceTimer = null;
+    let blinkTimer = null;
+    let isCliffDetected = false;
+    let mqttConnected = false;
+    let currentView = 'eyes'; // 'eyes' | 'text' | 'image'
+
+    // DOM Elements
+    const faceWrapper = document.getElementById('face-wrapper');
+    const eyesGrid = document.getElementById('eyes-grid');
+    const textView = document.getElementById('text-view');
+    const imageView = document.getElementById('image-view');
+    const txtContent = document.getElementById('display-text-content');
+    const imgContent = document.getElementById('display-image-content');
+
+    const mqttDot = document.getElementById('mqtt-dot');
+    const mqttText = document.getElementById('mqtt-text');
+    const stateBadge = document.getElementById('state-badge');
+    const lastMsgEl = document.getElementById('last-message');
+    const cliffWarning = document.getElementById('cliff-warning');
+    const connError = document.getElementById('connection-error');
+    
+    const btnWalk = document.getElementById('btn-walk');
+    const btnDance = document.getElementById('btn-dance');
+    const btnStop = document.getElementById('btn-stop');
+    const btnClearCliff = document.getElementById('btn-clear-cliff');
+    const emotionButtons = document.querySelectorAll('.emotion-grid button');
+
+    const inputText = document.getElementById('input-display-text');
+    const btnSendText = document.getElementById('btn-send-text');
+    const btnSendImage = document.getElementById('btn-send-image');
+    const btnRestoreEyes = document.getElementById('btn-restore-eyes');
+
+    // Connexion MQTT
+    const client = mqtt.connect(brokerUrl, {
+      clientId: 'kinopere_live_web_' + Math.random().toString(16).substring(2, 8),
+      clean: true
+    });
+
+    client.on('connect', () => {
+      mqttConnected = true;
+      mqttDot.classList.add('connected');
+      mqttText.textContent = 'Broker Connecté';
+      connError.style.display = 'none';
+      client.subscribe([controlTopic, displayTopic, statusTopic]);
+    });
+
+    client.on('message', (topic, message) => {
+      const payload = message.toString().trim();
+      lastMsgEl.textContent = `[${topic}] "${payload}"`;
+
+      if (topic === displayTopic) {
+        handleDisplayCommand(payload);
+      } else {
+        handlePayload(payload);
+      }
+    });
+
+    client.on('close', () => {
+      mqttConnected = false;
+      mqttDot.classList.remove('connected');
+      mqttText.textContent = 'Broker Déconnecté';
+    });
+
+    client.on('error', (err) => {
+      mqttConnected = false;
+      mqttDot.classList.remove('connected');
+      mqttText.textContent = 'Erreur Connexion';
+      connError.textContent = '⚠️ ' + err.message;
+      connError.style.display = 'block';
+    });
+
+    function handlePayload(payload) {
+      if (payload === 'WALK_FORWARD') {
+        startWalkAnimation();
+      } else if (payload === 'DANCE_HAPPY') {
+        startDanceAnimation();
+      } else if (payload === 'STOP') {
+        stopMovementAnimations();
+        triggerPreset('neutral');
+      } else if (payload === 'CLIFF_DETECTED') {
+        triggerCliffAlert();
+      }
+    }
+
+    function handleDisplayCommand(payload) {
+      try {
+        const data = JSON.parse(payload);
+        if (data.type === 'text') {
+          showText(data.content);
+        } else if (data.type === 'image') {
+          showImage(data.url);
+        } else if (data.type === 'eyes') {
+          showEyes();
+        }
+      } catch (e) {
+        // Fallback format de texte simple
+        if (payload.startsWith('TEXT:')) {
+          showText(payload.substring(5));
+        } else if (payload.startsWith('IMAGE:')) {
+          showImage(payload.substring(6));
+        } else if (payload === 'SHOW_EYES') {
+          showEyes();
+        } else {
+          showText(payload); // Par défaut on l'affiche comme du texte
+        }
+      }
+    }
+
+    // Gestion fluide du multi-vues
+    function showText(text) {
+      currentView = 'text';
+      txtContent.textContent = text;
+      updateViewsDOM();
+    }
+
+    function showImage(url) {
+      currentView = 'image';
+      imgContent.src = url;
+      updateViewsDOM();
+    }
+
+    function showEyes() {
+      currentView = 'eyes';
+      updateViewsDOM();
+    }
+
+    function updateViewsDOM() {
+      eyesGrid.classList.remove('active-view');
+      textView.classList.remove('active-view');
+      imageView.classList.remove('active-view');
+
+      if (currentView === 'eyes') {
+        eyesGrid.classList.add('active-view');
+        stateBadge.textContent = state.emotion.toUpperCase();
+      } else if (currentView === 'text') {
+        textView.classList.add('active-view');
+        stateBadge.textContent = 'TEXTE AFFICHÉ';
+      } else if (currentView === 'image') {
+        imageView.classList.add('active-view');
+        stateBadge.textContent = 'IMAGE AFFICHÉE';
+      }
+    }
+
+    /**
+     * Applique les styles calculés
+     */
+    function applyState(nextState, isBlinking = false) {
+      const emotion = nextState.emotion;
+      const preset = EMOTIONS[emotion] || EMOTIONS.neutral;
+
+      document.documentElement.style.setProperty('--bg', '#ffffff');
+      document.documentElement.style.setProperty('--accent', preset.accent);
+      document.documentElement.style.setProperty('--spark', preset.spark);
+
+      const openness = isBlinking ? 0.08 : nextState.openness;
+      const opacity = isBlinking ? 0.55 : (0.72 + nextState.glow * 0.28);
+      const glowStrength = Math.round(30 + nextState.glow * 40);
+
+      const CONTENT_SCALE = 1.5;
+      const eyeWidth = `${Math.round((preset.width + (1 - nextState.pupil_size) * 38) * CONTENT_SCALE)}px`;
+      const eyeHeight = `${Math.round((preset.height + openness * 24) * CONTENT_SCALE)}px`;
+
+      document.documentElement.style.setProperty('--eye-width', `min(33vw, ${eyeWidth})`);
+      document.documentElement.style.setProperty('--eye-height', `min(27vw, ${eyeHeight})`);
+
+      const leftContainer = document.getElementById('left-eye-container');
+      const rightContainer = document.getElementById('right-eye-container');
+      const leftCore = document.getElementById('left-eye-core');
+      const rightCore = document.getElementById('right-eye-core');
+      const leftEyebrow = document.getElementById('left-eyebrow');
+      const rightEyebrow = document.getElementById('right-eyebrow');
+
+      const cores = [leftCore, rightCore];
+      const containers = [leftContainer, rightContainer];
+      const eyebrows = [leftEyebrow, rightEyebrow];
+
+      containers.forEach((container) => {
+        if (!container) return;
+        const offsetX = Math.round(nextState.pupil_x * 26 * CONTENT_SCALE);
+        const offsetY = Math.round(nextState.pupil_y * 14 * CONTENT_SCALE);
+        container.style.setProperty('--eye-offset-x', `${offsetX}px`);
+        container.style.setProperty('--eye-offset-y', `${offsetY}px`);
+      });
+
+      const browPreset = EYEBROW_PRESETS[emotion] || EYEBROW_PRESETS.neutral;
+      leftEyebrow.style.transform = `translateY(${browPreset.leftY}px) rotate(${browPreset.leftRot}deg)`;
+      rightEyebrow.style.transform = `translateY(${browPreset.rightY}px) rotate(${browPreset.rightRot}deg)`;
+
+      cores.forEach((core) => {
+        if (!core) return;
+        core.style.clipPath = 'none';
+        core.style.borderRadius = '50%';
+      });
+
+      cores.forEach((core, index) => {
+        if (!core) return;
+        const side = index === 0 ? -1 : 1;
+        const openScaleVal = clamp(openness * preset.openScale, 0.12, 1.15);
+        const skew = preset.brow_tilt * side * (6 + preset.slant * 0.3);
+        const stretch = preset.widthScale + (1 - preset.pupil_size) * 0.18;
+        core.style.transform = `scaleY(${openScaleVal}) scaleX(${stretch}) skewX(${skew}deg)`;
+
+        const glowColor = nextState.accent;
+        core.style.boxShadow = [
+          `0 0 10px color-mix(in srgb, ${glowColor} 80%, transparent)`,
+          `0 0 20px color-mix(in srgb, ${glowColor} 50%, transparent)`,
+          `0 0 ${glowStrength}px color-mix(in srgb, ${glowColor} 30%, transparent)`,
+        ].join(", ");
+
+        core.style.opacity = String(opacity);
+
+        const hlLarge = core.querySelector('.eye-highlight.large');
+        const hlSmall = core.querySelector('.eye-highlight.small');
+        if (hlLarge && hlSmall) {
+          if (emotion === 'surprised' || emotion === 'angry' || emotion === 'love') {
+            hlLarge.style.transform = 'scale(0.5)';
+            hlSmall.style.opacity = '0';
+          } else {
+            hlLarge.style.transform = 'scale(1)';
+            hlSmall.style.opacity = '1';
+          }
+        }
+      });
+    }
+
+    function triggerPreset(emotionName) {
+      if (isCliffDetected && emotionName !== 'surprised' && emotionName !== 'neutral') {
+        return;
+      }
+      
+      const preset = EMOTIONS[emotionName];
+      if (!preset) return;
+
+      showEyes(); // Affiche la vue des yeux lors des changements d'émotions
+
+      faceWrapper.classList.remove('love', 'sad', 'sleepy', 'angry', 'happy', 'curious', 'thinking');
+      faceWrapper.classList.add(emotionName);
+
+      if (emotionName === 'angry') {
+        eyesGrid.className = 'eyes-layout screen-view active-view angry-shaking';
+      } else if (isCliffDetected) {
+        eyesGrid.className = 'eyes-layout screen-view active-view cliff-shaking';
+      } else {
+        eyesGrid.className = 'eyes-layout screen-view active-view';
+      }
+
+      state = {
+        ...state,
+        emotion: emotionName,
+        openness: preset.openness,
+        pupil_size: preset.pupil_size,
+        brow_tilt: preset.brow_tilt,
+        eyelid_curve: preset.eyelid_curve,
+        glow: preset.glow,
+        blink_interval: preset.blink_interval,
+        background: "#ffffff",
+        accent: preset.accent,
+        spark: preset.spark,
+        pupil_x: (isWalking || isDancing) ? state.pupil_x : 0.0,
+        pupil_y: (isWalking || isDancing) ? state.pupil_y : 0.0
+      };
+
+      emotionButtons.forEach(btn => {
+        if (btn.getAttribute('data-emotion') === emotionName) {
+          btn.classList.add('active-btn');
+        } else {
+          btn.classList.remove('active-btn');
+        }
+      });
+
+      applyState(state);
+      scheduleBlink();
+    }
+
+    function scheduleBlink() {
+      clearTimeout(blinkTimer);
+      const delay = (state.blink_interval + Math.random() * 1.5) * 1000;
+      blinkTimer = setTimeout(triggerBlink, delay);
+    }
+
+    function triggerBlink() {
+      if (state.emotion === 'sleepy' || currentView !== 'eyes') {
+        scheduleBlink();
+        return;
+      }
+      applyState(state, true);
+      setTimeout(() => {
+        applyState(state, false);
+        scheduleBlink();
+      }, 120);
+    }
+
+    function startWalkAnimation() {
+      stopMovementAnimations();
+      isWalking = true;
+      triggerPreset('curious');
+      
+      // Ajoute l'animation physique de marche de tout l'écran
+      eyesGrid.className = 'eyes-layout screen-view active-view walk-body-sway';
+
+      let startTime = Date.now();
+      walkTimer = setInterval(() => {
+        const elapsed = (Date.now() - startTime) / 1000;
+        state.pupil_x = Math.sin(elapsed * 2 * Math.PI / 2.5) * 0.6;
+        state.pupil_y = 0.0;
+        applyState(state);
+      }, 30);
+    }
+
+    function startDanceAnimation() {
+      stopMovementAnimations();
+      isDancing = true;
+      triggerPreset('happy');
+      
+      // Ajoute l'animation physique de danse de tout l'écran
+      eyesGrid.className = 'eyes-layout screen-view active-view dance-body-bounce';
+
+      let startTime = Date.now();
+      danceTimer = setInterval(() => {
+        const elapsed = (Date.now() - startTime) / 1000;
+        state.pupil_x = Math.sin(elapsed * 2 * Math.PI / 1.2) * 0.4;
+        state.pupil_y = Math.cos(elapsed * 2 * Math.PI / 0.6) * 0.2 - 0.1;
+        applyState(state);
+      }, 30);
+    }
+
+    function stopMovementAnimations() {
+      isWalking = false;
+      isDancing = false;
+      clearInterval(walkTimer);
+      clearInterval(danceTimer);
+      state.pupil_x = 0.0;
+      state.pupil_y = 0.0;
+      eyesGrid.className = 'eyes-layout screen-view active-view';
+    }
+
+    function triggerCliffAlert() {
+      stopMovementAnimations();
+      isCliffDetected = true;
+      triggerPreset('surprised');
+      
+      eyesGrid.className = 'eyes-layout screen-view active-view cliff-shaking';
+      faceWrapper.classList.add('cliff');
+      stateBadge.className = 'state-badge cliff-badge';
+      stateBadge.textContent = 'ALERTE CHUTE';
+      cliffWarning.style.display = 'block';
+
+      btnWalk.disabled = true;
+      btnDance.disabled = true;
+      btnStop.disabled = true;
+      btnClearCliff.disabled = false;
+    }
+
+    function clearCliffAlert() {
+      isCliffDetected = false;
+      eyesGrid.className = 'eyes-layout screen-view active-view';
+      faceWrapper.classList.remove('cliff');
+      stateBadge.className = 'state-badge';
+      
+      btnWalk.disabled = false;
+      btnDance.disabled = false;
+      btnStop.disabled = false;
+      btnClearCliff.disabled = true;
+
+      triggerPreset('neutral');
+    }
+
+    function publish(topic, message) {
+      if (mqttConnected) {
+        client.publish(topic, message);
+      }
+    }
+
+    emotionButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const emo = btn.getAttribute('data-emotion');
+        stopMovementAnimations();
+        triggerPreset(emo);
+      });
+    });
+
+    // Contrôles locaux et simulation d'affichage
+    btnSendText.addEventListener('click', () => {
+      const text = inputText.value.trim();
+      if (text) {
+        showText(text);
+        publish(displayTopic, JSON.stringify({ type: 'text', content: text }));
+      }
+    });
+
+    btnSendImage.addEventListener('click', () => {
+      // Affiche l'image d'éducation copiée localement
+      showImage('education_graphic.jpg');
+      publish(displayTopic, JSON.stringify({ type: 'image', url: 'education_graphic.jpg' }));
+    });
+
+    btnRestoreEyes.addEventListener('click', () => {
+      showEyes();
+      publish(displayTopic, JSON.stringify({ type: 'eyes' }));
+    });
+
+    btnWalk.addEventListener('click', () => publish(controlTopic, 'WALK_FORWARD'));
+    btnDance.addEventListener('click', () => publish(controlTopic, 'DANCE_HAPPY'));
+    btnStop.addEventListener('click', () => publish(controlTopic, 'STOP'));
+    btnClearCliff.addEventListener('click', () => {
+      clearCliffAlert();
+      publish(controlTopic, 'STOP');
+    });
+
+    // Initialisation
+    triggerPreset('neutral');
+
+    function clamp(value, minimum, maximum) {
+      return Math.max(minimum, Math.min(value, maximum));
+    }
+  </script>
+</body>
+</html>
