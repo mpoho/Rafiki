@@ -1,4 +1,4 @@
-#include <ESP32Servo.h>
+
 
 // --- Configuration Matérielle (Pins correspondants à ton schéma Cirkit) ---
 #define PIN_YL 4  // Jambe Gauche
