@@ -103,7 +103,13 @@ export default function KinOpereFace({
   const [lastMessage, setLastMessage] = useState('Aucun');
   const [errorMsg, setErrorMsg] = useState(null);
 
+  const [serialConnected, setSerialConnected] = useState(false);
+
   const mqttClientRef = useRef(null);
+  const serialPortRef = useRef(null);
+  const serialWriterRef = useRef(null);
+  const serialReaderRef = useRef(null);
+  const serialReadLoopActiveRef = useRef(false);
 
   // 1. Connexion MQTT (SSR Safe)
   useEffect(() => {
@@ -274,9 +280,145 @@ export default function KinOpereFace({
     }
   };
 
+  const toggleSerialConnection = async () => {
+    if (serialConnected) {
+      await disconnectSerial();
+    } else {
+      await connectSerial();
+    }
+  };
+
+  const connectSerial = async () => {
+    if (typeof window === 'undefined' || !navigator.serial) {
+      alert("La Web Serial API n'est pas supportée par ce navigateur.");
+      return;
+    }
+    try {
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      
+      serialPortRef.current = port;
+      serialWriterRef.current = port.writable.getWriter();
+      serialReadLoopActiveRef.current = true;
+      setSerialConnected(true);
+      
+      readSerial();
+      console.log("Web Serial connecté à l'Arduino.");
+    } catch (err) {
+      console.error("Échec de la connexion Web Serial :", err);
+      alert("Erreur de connexion série: " + err.message);
+    }
+  };
+
+  const disconnectSerial = async () => {
+    serialReadLoopActiveRef.current = false;
+    if (serialReaderRef.current) {
+      try {
+        await serialReaderRef.current.cancel();
+      } catch (e) {}
+    }
+    if (serialWriterRef.current) {
+      try {
+        serialWriterRef.current.releaseLock();
+      } catch (e) {}
+      serialWriterRef.current = null;
+    }
+    if (serialPortRef.current) {
+      try {
+        await serialPortRef.current.close();
+      } catch (e) {}
+      serialPortRef.current = null;
+    }
+    setSerialConnected(false);
+    console.log("Web Serial déconnecté.");
+  };
+
+  const sendSerial = async (data) => {
+    if (serialConnected && serialWriterRef.current) {
+      try {
+        const encoder = new TextEncoder();
+        await serialWriterRef.current.write(encoder.encode(data + '\n'));
+        console.log("Serial envoyé :", data);
+      } catch (e) {
+        console.error("Erreur d'écriture Serial :", e);
+      }
+    }
+  };
+
+  const readSerial = async () => {
+    const port = serialPortRef.current;
+    while (port && port.readable && serialReadLoopActiveRef.current) {
+      try {
+        const decoder = new TextDecoderStream();
+        const inputClosed = port.readable.pipeTo(decoder.writable);
+        const reader = decoder.readable.getReader();
+        serialReaderRef.current = reader;
+        
+        let buffer = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          
+          buffer += value;
+          let lines = buffer.split('\n');
+          buffer = lines.pop();
+          
+          for (let line of lines) {
+            handleSerialInput(line.trim());
+          }
+        }
+      } catch (err) {
+        console.error("Erreur de lecture Serial :", err);
+        break;
+      } finally {
+        if (serialReaderRef.current) {
+          try {
+            serialReaderRef.current.releaseLock();
+          } catch (e) {}
+          serialReaderRef.current = null;
+        }
+      }
+    }
+  };
+
+  const handleSerialInput = (line) => {
+    if (!line) return;
+    console.log("Serial reçu de l'Arduino :", line);
+    setLastMessage(`[SERIAL] "${line}"`);
+    
+    if (line.includes("CLIFF_DETECTED") || line.includes("ALERTE SECOURS")) {
+      setIsCliffDetected(true);
+      setEmotion('surprised');
+      setCurrentView('eyes');
+    } else if (line.includes("STOP")) {
+      setIsWalking(false);
+      setIsDancing(false);
+      setEmotion('neutral');
+    }
+  };
+
   const publishCommand = (topic, message) => {
     if (mqttClientRef.current && mqttConnected) {
       mqttClientRef.current.publish(topic, message);
+    }
+    
+    if (serialConnected) {
+      if (topic === controlTopic) {
+        sendSerial(message);
+      } else if (topic === displayTopic) {
+        try {
+          const data = JSON.parse(message);
+          if (data.type === 'text') {
+            sendSerial("TEXT:" + data.content);
+          } else if (data.type === 'image') {
+            sendSerial("IMAGE:" + data.url);
+          } else if (data.type === 'eyes') {
+            sendSerial("SHOW_EYES");
+          }
+        } catch (e) {
+          sendSerial(message);
+        }
+      }
     }
   };
 
@@ -286,6 +428,12 @@ export default function KinOpereFace({
     setIsWalking(false);
     setIsDancing(false);
     setEmotion(presetName);
+    
+    if (serialConnected) {
+      let cmd = presetName.toUpperCase();
+      if (cmd === 'SLEEPY') cmd = 'SLEEP';
+      sendSerial(cmd);
+    }
   };
 
   const clearCliffAlert = () => {
@@ -511,12 +659,33 @@ export default function KinOpereFace({
 
       {/* Tableau de Bord */}
       <div className="dashboard-controls">
-        <div className="status-row">
-          <div className="mqtt-status">
+        <div className="status-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div className="mqtt-status" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <div className={`status-dot ${mqttConnected ? 'connected' : ''}`} />
             <span>
               {mqttConnected ? 'Broker Connecté' : 'Broker Déconnecté'}
             </span>
+          </div>
+
+          <div className="serial-status" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div 
+              className="status-dot" 
+              style={{ 
+                backgroundColor: serialConnected ? '#22c55e' : '#ef4444', 
+                width: '10px', 
+                height: '10px', 
+                borderRadius: '50%',
+                display: 'inline-block',
+                transition: 'background-color 0.3s'
+              }} 
+            />
+            <button 
+              onClick={toggleSerialConnection}
+              className="btn-control" 
+              style={{ fontSize: '11px', padding: '4px 8px', margin: 0, minHeight: 'unset', lineHeight: 1 }}
+            >
+              {serialConnected ? 'Déconnecter USB' : 'Connecter Arduino'}
+            </button>
           </div>
 
           <div className="robot-state-label">

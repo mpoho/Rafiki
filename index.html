@@ -6,9 +6,24 @@
   <title>Kin Opere - AI Assistant Facial Dashboard</title>
   <link rel="stylesheet" href="KinOpereFace.css">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Force les sourcils à être de beaux arcs de cercle courbés (contournement du cache) */
+    .eyebrow-element {
+      position: absolute !important;
+      width: 90% !important;
+      height: calc(60px * var(--content-scale)) !important;
+      background: transparent !important;
+      border: none !important;
+      border-top: calc(11px * var(--content-scale)) solid #090d16 !important;
+      border-radius: 50% !important;
+      top: calc(-20px * var(--content-scale)) !important;
+      left: 5% !important;
+      transition: transform 250ms cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+    }
+  </style>
 </head>
 <body style="margin: 0; background: #e2e8f0; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; box-sizing: border-box;">
-
+<br>
   <div id="root" style="width: 100%; max-width: 800px;">
     <!-- Visage Kin Opere -->
     <div id="face-wrapper" class="kinopere-face-wrapper">
@@ -104,10 +119,15 @@
 
       <!-- Console de Contrôle et Sélections d'Expressions -->
       <div class="dashboard-controls">
-        <div class="status-row">
-          <div class="mqtt-status">
+        <div class="status-row" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <div class="mqtt-status" style="display: flex; align-items: center; gap: 6px;">
             <div id="mqtt-dot" class="status-dot"></div>
             <span id="mqtt-text">Connexion Broker...</span>
+          </div>
+
+          <div class="serial-status" style="display: flex; align-items: center; gap: 6px;">
+            <div id="serial-dot" class="status-dot" style="background: #ef4444; width: 10px; height: 10px; border-radius: 50%; display: inline-block; transition: background-color 0.3s;"></div>
+            <button id="btn-serial-connect" class="btn-control" style="font-size: 11px; padding: 4px 8px; margin: 0; min-height: unset; line-height: 1;">Connecter Arduino</button>
           </div>
 
           <div class="robot-state-label">
@@ -267,7 +287,16 @@
     let mqttConnected = false;
     let currentView = 'eyes'; // 'eyes' | 'text' | 'image'
 
+    // Web Serial API Variables
+    let serialPort = null;
+    let serialReader = null;
+    let serialWriter = null;
+    let serialReadLoopActive = false;
+    let serialConnected = false;
+
     // DOM Elements
+    const btnSerialConnect = document.getElementById('btn-serial-connect');
+    const serialDot = document.getElementById('serial-dot');
     const faceWrapper = document.getElementById('face-wrapper');
     const eyesGrid = document.getElementById('eyes-grid');
     const textView = document.getElementById('text-view');
@@ -532,6 +561,12 @@
         }
       });
 
+      if (serialConnected) {
+        let cmd = emotionName.toUpperCase();
+        if (cmd === 'SLEEPY') cmd = 'SLEEP';
+        sendSerial(cmd);
+      }
+
       applyState(state);
       scheduleBlink();
     }
@@ -629,11 +664,149 @@
       triggerPreset('neutral');
     }
 
+    // --- Web Serial API Support ---
+    async function toggleSerialConnection() {
+      if (serialConnected) {
+        await disconnectSerial();
+      } else {
+        await connectSerial();
+      }
+    }
+
+    async function connectSerial() {
+      try {
+        serialPort = await navigator.serial.requestPort();
+        await serialPort.open({ baudRate: 115200 });
+        
+        serialWriter = serialPort.writable.getWriter();
+        serialConnected = true;
+        serialReadLoopActive = true;
+        
+        serialDot.style.backgroundColor = '#22c55e';
+        btnSerialConnect.textContent = 'Déconnecter USB';
+        
+        readSerial();
+        console.log("Web Serial connecté à l'Arduino.");
+      } catch (err) {
+        console.error("Échec de la connexion Web Serial :", err);
+        alert("Erreur de connexion série: " + err.message);
+      }
+    }
+
+    async function disconnectSerial() {
+      serialReadLoopActive = false;
+      if (serialReader) {
+        try {
+          await serialReader.cancel();
+        } catch (e) {}
+      }
+      if (serialWriter) {
+        try {
+          serialWriter.releaseLock();
+        } catch (e) {}
+        serialWriter = null;
+      }
+      if (serialPort) {
+        try {
+          await serialPort.close();
+        } catch (e) {}
+        serialPort = null;
+      }
+      serialConnected = false;
+      serialDot.style.backgroundColor = '#ef4444';
+      btnSerialConnect.textContent = 'Connecter Arduino';
+      console.log("Web Serial déconnecté.");
+    }
+
+    async function sendSerial(data) {
+      if (serialConnected && serialWriter) {
+        try {
+          const encoder = new TextEncoder();
+          await serialWriter.write(encoder.encode(data + '\n'));
+          console.log("Serial envoyé :", data);
+        } catch (e) {
+          console.error("Erreur d'écriture Serial :", e);
+        }
+      }
+    }
+
+    async function readSerial() {
+      while (serialPort && serialPort.readable && serialReadLoopActive) {
+        try {
+          const decoder = new TextDecoderStream();
+          const inputClosed = serialPort.readable.pipeTo(decoder.writable);
+          const reader = decoder.readable.getReader();
+          serialReader = reader;
+          
+          let buffer = "";
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            
+            buffer += value;
+            let lines = buffer.split('\n');
+            buffer = lines.pop(); // Conserve la ligne incomplète
+            
+            for (let line of lines) {
+              handleSerialInput(line.trim());
+            }
+          }
+        } catch (err) {
+          console.error("Erreur de lecture Serial :", err);
+          break;
+        } finally {
+          if (serialReader) {
+            try {
+              serialReader.releaseLock();
+            } catch (e) {}
+            serialReader = null;
+          }
+        }
+      }
+    }
+
+    function handleSerialInput(line) {
+      if (!line) return;
+      console.log("Serial reçu de l'Arduino :", line);
+      
+      // Affiche le dernier payload reçu de l'Arduino
+      lastMsgEl.textContent = `[SERIAL] "${line}"`;
+      
+      // Traitement des alertes d'obstacle ou de chute renvoyées par l'Arduino
+      if (line.includes("CLIFF_DETECTED") || line.includes("ALERTE SECOURS")) {
+        triggerCliffAlert();
+      } else if (line.includes("STOP")) {
+        stopMovementAnimations();
+        triggerPreset('neutral');
+      }
+    }
+
     function publish(topic, message) {
       if (mqttConnected) {
         client.publish(topic, message);
       }
+
+      if (serialConnected) {
+        if (topic === controlTopic) {
+          sendSerial(message);
+        } else if (topic === displayTopic) {
+          try {
+            const data = JSON.parse(message);
+            if (data.type === 'text') {
+              sendSerial("TEXT:" + data.content);
+            } else if (data.type === 'image') {
+              sendSerial("IMAGE:" + data.url);
+            } else if (data.type === 'eyes') {
+              sendSerial("SHOW_EYES");
+            }
+          } catch (e) {
+            sendSerial(message);
+          }
+        }
+      }
     }
+
+    btnSerialConnect.addEventListener('click', toggleSerialConnection);
 
     emotionButtons.forEach(btn => {
       btn.addEventListener('click', () => {
