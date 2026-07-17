@@ -65,7 +65,8 @@ enum RobotState {
   STATE_NEGATION = 19,        // Négation (secouer la tête de gauche à droite)
   STATE_TALK = 20,            // Parler en bougeant la tête
   STATE_TINY_WALK_FORWARD = 21, // Avancer un tout petit peu (1 pas)
-  STATE_TINY_WALK_BACKWARD = 22 // Reculer un tout petit peu (1 pas)
+  STATE_TINY_WALK_BACKWARD = 22, // Reculer un tout petit peu (1 pas)
+  STATE_DANCE_RNB_WINE = 24     // Danse R&B (Slow whining / rotation hanches)
 };
 
 // --- États des Séquences de Mouvement ---
@@ -160,7 +161,7 @@ void printMenu() {
   Serial.println(F("  18 / HAUSSER       : Hausser la tete (inclinaison arriere)"));
   Serial.println(F("  19 / NON / NEGATION: Dire non (secouer la tete)"));
   Serial.println(F("  21 / PARLER / TALK : Parler en bougeant la tete (avec beeps)"));
-  Serial.println(F("  20 / DANSE / DANCE : Danser (balancement lateral)"));
+  Serial.println(F("  20 / DANSE / DANCE : Danser (Salsa polyrythmique)"));
   Serial.println(F("\n--- SEQUENCES AUTOMATIQUES ---"));
   Serial.println(F("  16 / SEQ1          : Sequence longue (Avancer -> Tourner -> Petit recul ->"));
   Serial.println(F("                       Hausser la tete -> Negation -> Danser -> Parler)"));
@@ -168,7 +169,7 @@ void printMenu() {
   Serial.println(F("\n--- AUTRES DANSES DISPONIBLES ---"));
   Serial.println(F("  5 : Pencher a gauche | 6 : Pencher a droite | 7 : Sauter"));
   Serial.println(F("  8 : Moonwalk | 9 : Shake | 11 : Pointe des pieds | 12 : Crusaito"));
-  Serial.println(F("  13 : Jitter (tremblement) | 14 : Flap (battement)"));
+  Serial.println(F("  13 : Jitter (tremblement) | 14 : Flap (battement) | 24 : R&B Wine (slow)"));
   Serial.println(F("============================================"));
 }
 
@@ -282,6 +283,9 @@ void readSerialCommand() {
     } else if (cmdUpper == "TINY_BACKWARD" || cmdUpper == "PETIT_ARRIERE" || stateNum == 23) {
       newState = STATE_TINY_WALK_BACKWARD;
       valid = true;
+    } else if (cmdUpper == "DANCE_RNB" || cmdUpper == "WINE" || cmdUpper == "WINER" || stateNum == 24) {
+      newState = STATE_DANCE_RNB_WINE;
+      valid = true;
     }
 
     if (valid) {
@@ -320,21 +324,23 @@ void calculateTargetAngles(float targets[4]) {
   switch (currentState) {
     case STATE_WALK_FORWARD: {
       // Marche Avant en ligne droite (déphasage de 90° entre jambes et pieds)
+      // Ajustement des amplitudes pour corriger la déviation vers la gauche
+      // Application de biais positifs pour éviter le clipping à 0°
       float phase = (float)(elapsed % 1200) / 1200.0f * 2.0f * M_PI;
-      targets[0] = (float)BASE_ANGLE + 28.0f * sin(phase); // Jambe Gauche
-      targets[1] = (float)BASE_ANGLE + 28.0f * sin(phase); // Jambe Droite
-      targets[2] = (float)BASE_ANGLE + 4.0f + 20.0f * sin(phase - M_PI/2.0f); // Pied Gauche
-      targets[3] = (float)BASE_ANGLE - 4.0f + 20.0f * sin(phase - M_PI/2.0f); // Pied Droite
+      targets[0] = 34.0f * sin(phase); // Jambe Gauche (Trim: 80, pas de clipping)
+      targets[1] = 22.0f + 22.0f * sin(phase); // Jambe Droite (Biaisée pour éviter clipping)
+      targets[2] = 20.0f + 20.0f * sin(phase - M_PI/2.0f); // Pied Gauche (Biaisé pour éviter clipping)
+      targets[3] = 20.0f + 20.0f * sin(phase - M_PI/2.0f); // Pied Droite (Biaisé pour éviter clipping)
       break;
     }
 
     case STATE_WALK_BACKWARD: {
-      // Marche Arrière (déphasage inverse)
+      // Marche Arrière (déphasage inverse, biaisés)
       float phase = (float)(elapsed % 1200) / 1200.0f * 2.0f * M_PI;
-      targets[0] = (float)BASE_ANGLE + 28.0f * sin(phase);
-      targets[1] = (float)BASE_ANGLE + 28.0f * sin(phase);
-      targets[2] = (float)BASE_ANGLE + 4.0f + 20.0f * sin(phase + M_PI/2.0f);
-      targets[3] = (float)BASE_ANGLE - 4.0f + 20.0f * sin(phase + M_PI/2.0f);
+      targets[0] = 28.0f * sin(phase);
+      targets[1] = 28.0f + 28.0f * sin(phase);
+      targets[2] = 20.0f + 20.0f * sin(phase + M_PI/2.0f);
+      targets[3] = 20.0f + 20.0f * sin(phase + M_PI/2.0f);
       break;
     }
 
@@ -409,12 +415,16 @@ void calculateTargetAngles(float targets[4]) {
     }
 
     case STATE_DANCE_SWING: {
-      // Swing (balancement de gauche à droite, jambes droites, pieds oscillant en phase)
-      float phase = (float)(elapsed % 1000) / 1000.0f * 2.0f * M_PI;
-      targets[0] = (float)BASE_ANGLE;
-      targets[1] = (float)BASE_ANGLE;
-      targets[2] = (float)BASE_ANGLE + 20.0f * sin(phase);
-      targets[3] = (float)BASE_ANGLE + 20.0f * sin(phase);
+      // Salsa Polyrythmique (balancement lent des hanches et double tap rapide des pieds)
+      float phase = (float)(elapsed % 1200) / 1200.0f * 2.0f * M_PI;
+      
+      // Balancement alterné des hanches (YL/YR de 0° à 30°, déphasés à 180° ou PI)
+      targets[0] = 15.0f + 15.0f * sin(phase);
+      targets[1] = 15.0f + 15.0f * sin(phase + M_PI);
+      
+      // Double tap rapide des pieds (RL/RR à double vitesse de 0° à 25°, déphasés à 90° ou PI/2)
+      targets[2] = 12.5f + 12.5f * sin(2.0f * phase);
+      targets[3] = 12.5f + 12.5f * sin(2.0f * phase + M_PI/2.0f);
       break;
     }
 
@@ -455,6 +465,21 @@ void calculateTargetAngles(float targets[4]) {
       targets[1] = (float)BASE_ANGLE - 20.0f * sin(phase);
       targets[2] = (float)BASE_ANGLE;
       targets[3] = (float)BASE_ANGLE;
+      break;
+    }
+
+    case STATE_DANCE_RNB_WINE: {
+      // Slow RnB Wining (mouvement circulaire fluide des hanches et du bassin)
+      // Période de 2400ms (très lent et fluide)
+      float phase = (float)(elapsed % 2400) / 2400.0f * 2.0f * M_PI;
+      
+      // Pitch (inclinaison avant/arrière par les hanches YL/YR) en cosinus
+      targets[0] = 12.0f + 12.0f * cos(phase);
+      targets[1] = 12.0f + 12.0f * cos(phase + M_PI/4.0f); // Déphasage léger pour vriller le bassin
+      
+      // Roll (inclinaison gauche/droite par les pieds RL/RR) en sinus
+      targets[2] = 15.0f + 15.0f * sin(phase);
+      targets[3] = 15.0f + 15.0f * sin(phase + M_PI/4.0f); // Déphasage léger assorti
       break;
     }
 
@@ -510,10 +535,10 @@ void calculateTargetAngles(float targets[4]) {
     }
 
     case STATE_TINY_WALK_FORWARD: {
-      // Avancer d'un tout petit pas
+      // Avancer d'un tout petit pas (avec correction de trajectoire)
       float phase = (float)(elapsed % 1200) / 1200.0f * 2.0f * M_PI;
-      targets[0] = (float)BASE_ANGLE + 15.0f * sin(phase);
-      targets[1] = (float)BASE_ANGLE + 15.0f * sin(phase);
+      targets[0] = (float)BASE_ANGLE + 18.0f * sin(phase); // Jambe Gauche
+      targets[1] = (float)BASE_ANGLE + 12.0f * sin(phase); // Jambe Droite
       targets[2] = (float)BASE_ANGLE + 4.0f + 10.0f * sin(phase - M_PI/2.0f);
       targets[3] = (float)BASE_ANGLE - 4.0f + 10.0f * sin(phase - M_PI/2.0f);
       // Auto-stop après 1 cycle (1200 ms)
@@ -582,8 +607,8 @@ void calculateTargetAngles(float targets[4]) {
       // Application des cibles de l'étape active
       if (currentSeq1Step == SEQ1_WALK_FORWARD) {
         float phase = (float)(seqElapsed % 1200) / 1200.0f * 2.0f * M_PI;
-        targets[0] = (float)BASE_ANGLE + 28.0f * sin(phase);
-        targets[1] = (float)BASE_ANGLE + 28.0f * sin(phase);
+        targets[0] = (float)BASE_ANGLE + 34.0f * sin(phase);
+        targets[1] = (float)BASE_ANGLE + 22.0f * sin(phase);
         targets[2] = (float)BASE_ANGLE + 4.0f + 20.0f * sin(phase - M_PI/2.0f);
         targets[3] = (float)BASE_ANGLE - 4.0f + 20.0f * sin(phase - M_PI/2.0f);
       } 
@@ -665,8 +690,8 @@ void calculateTargetAngles(float targets[4]) {
       // Application des cibles de la séquence courte
       if (currentSeq2Step == SEQ2_TINY_FORWARD) {
         float phase = (float)(seqElapsed % 1200) / 1200.0f * 2.0f * M_PI;
-        targets[0] = (float)BASE_ANGLE + 15.0f * sin(phase);
-        targets[1] = (float)BASE_ANGLE + 15.0f * sin(phase);
+        targets[0] = (float)BASE_ANGLE + 18.0f * sin(phase);
+        targets[1] = (float)BASE_ANGLE + 12.0f * sin(phase);
         targets[2] = (float)BASE_ANGLE + 4.0f + 10.0f * sin(phase - M_PI/2.0f);
         targets[3] = (float)BASE_ANGLE - 4.0f + 10.0f * sin(phase - M_PI/2.0f);
       } 
