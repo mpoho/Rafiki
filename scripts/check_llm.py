@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -43,6 +44,34 @@ def format_size(path: Path) -> str:
     return f"{size_mb:.1f} MB"
 
 
+def print_llama_cache(server_path: Path | None) -> None:
+    if not server_path:
+        return
+
+    try:
+        result = subprocess.run(
+            [str(server_path), "--cache-list"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+        return
+
+    cache_lines = [
+        line.strip()
+        for line in result.stdout.splitlines()
+        if line.strip() and not line.startswith("number of models")
+    ]
+    if not cache_lines:
+        return
+
+    print("llama.cpp cached models:")
+    for line in cache_lines:
+        print(f"  {line}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Check the local Rafiki LLM server and GGUF model files."
@@ -56,6 +85,8 @@ def main() -> int:
         print(f"llama-server: found at {server_path}")
     else:
         print("llama-server: not found in PATH or /home/admin/llama.cpp/build/bin")
+
+    print_llama_cache(server_path)
 
     models = find_gguf_models(args.models_dir)
     chat_models = [

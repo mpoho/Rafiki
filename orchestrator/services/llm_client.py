@@ -49,6 +49,7 @@ RAFIKI_SCHEMA = {
     "properties": {
         "speech": {
             "type": "string",
+            "maxLength": 180,
         },
         "emotion": {
             "type": "string",
@@ -84,6 +85,7 @@ RAFIKI_SCHEMA = {
         },
         "screen_content": {
             "type": "string",
+            "maxLength": 120,
         },
     },
     "required": [
@@ -183,7 +185,13 @@ class RafikiLLMClient:
             f"Réponds principalement dans la langue suivante : {language}. "
             "Ne demande jamais au robot d'exécuter une action dangereuse. "
             "Choisis uniquement les émotions, mouvements et modes d'écran "
-            "autorisés par le schéma JSON."
+            "autorisés par le schéma JSON. "
+            "Tu dois répondre uniquement avec un objet JSON valide, compact, "
+            "sans Markdown, sans explication et sans texte autour. "
+            "Le champ speech doit contenir au maximum deux phrases courtes. "
+            "Ne répète jamais la même idée, le même groupe de mots ou la "
+            "même phrase. Si tu racontes une blague, elle doit tenir en une "
+            "seule phrase simple."
         )
 
         messages: list[dict[str, str]] = [
@@ -207,7 +215,9 @@ class RafikiLLMClient:
             "model": self.model,
             "messages": messages,
             "temperature": 0.0,
-            "max_tokens": 180,
+            "max_tokens": 220,
+            "frequency_penalty": 0.4,
+            "repeat_penalty": 1.18,
             "stream": False,
             "chat_template_kwargs": {
                 "enable_thinking": False,

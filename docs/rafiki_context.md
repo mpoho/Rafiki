@@ -15,7 +15,12 @@ Etat actuel de la Raspberry :
 - `llama-server` existe dans `/home/admin/llama.cpp/build/bin/llama-server` ;
 - aucun vrai modele GGUF de chat n'a encore ete trouve dans `/home/admin/llama.cpp/models` ;
 - les fichiers GGUF presents sont des vocabulaires trop petits pour lancer Rafiki comme assistant ;
+- le modele vise pour la conversation locale est `ggml-org/gemma-3-4b-it-GGUF:Q4_K_M`
+  via `llama-server` ;
 - les premiers tests couvrent le contrat JSON attendu du LLM, sans dependance au serveur local.
+- la reponse vocale locale utilise `espeak-ng`, deja present sur la Raspberry ;
+- les peripheriques de lecture HDMI sont visibles hors sandbox, mais aucun micro ALSA
+  n'est detecte pour l'instant.
 
 Decision LLM attendue :
 

@@ -26,3 +26,16 @@ Faire un essai de generation quand `llama-server` est demarre :
 ```bash
 .venv/bin/python scripts/generate_llm_sample.py
 ```
+
+Discuter avec Rafiki depuis le terminal, avec reponse vocale :
+
+```bash
+.venv/bin/python scripts/talk_to_rafiki.py
+```
+
+Si aucun modele local n'est encore installe, lancer Gemma 3 4B dans un
+deuxieme terminal :
+
+```bash
+bash scripts/start_llama_server_gemma.sh
+```
