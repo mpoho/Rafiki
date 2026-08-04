@@ -20,7 +20,7 @@ def test_parse_rafiki_decision_from_dict() -> None:
 
     assert isinstance(decision, RafikiDecision)
     assert decision.emotion == "happy"
-    assert decision.screen_mode == "learning"
+    assert decision.screen_mode == "face"
 
 
 def test_parse_rafiki_decision_from_markdown_json() -> None:
@@ -79,3 +79,54 @@ def test_parse_rafiki_decision_rejects_unknown_action() -> None:
             }
             """
         )
+
+
+def test_parse_rafiki_decision_replaces_forbidden_robot_intro() -> None:
+    decision = parse_rafiki_decision(
+        {
+            "speech": "Je suis un robot compagnon éducatif pour vous aider.",
+            "emotion": "happy",
+            "movement": "none",
+            "screen_mode": "text",
+            "screen_content": "Bonjour",
+        }
+    )
+
+    assert decision.speech == "Salut ! Tu veux jouer ou discuter ?"
+    assert decision.screen_mode == "face"
+    assert decision.screen_content == ""
+
+
+def test_parse_rafiki_decision_keeps_quiz_text_only_for_question() -> None:
+    decision = parse_rafiki_decision(
+        {
+            "speech": "Quel animal miaule ?",
+            "emotion": "happy",
+            "movement": "none",
+            "screen_mode": "quiz",
+            "screen_content": "Chat ou chien ?",
+        }
+    )
+
+    assert decision.screen_mode == "quiz"
+    assert decision.screen_content == "Chat ou chien ?"
+
+
+def test_parse_rafiki_decision_keeps_complete_sentence() -> None:
+    decision = parse_rafiki_decision(
+        {
+            "speech": (
+                "Les monuments sont des bâtiments historiques qui symbolisent "
+                "l'histoire et le patrimoine culturel de la région ou du pays."
+            ),
+            "emotion": "happy",
+            "movement": "none",
+            "screen_mode": "face",
+            "screen_content": "",
+        }
+    )
+
+    assert decision.speech == (
+        "Les monuments sont des bâtiments historiques qui symbolisent "
+        "l'histoire et le patrimoine culturel de la région ou du pays."
+    )

@@ -8,9 +8,28 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from body.controller import (
+    ArduinoSerialBodyController,
+    BodyControlError,
+    BodyController,
+    CommandBodyController,
+    LoggingBodyController,
+    NullBodyController,
+)
 from orchestrator.services.fallback_client import FallbackRafikiClient
-from orchestrator.services.llm_client import LLMClientError, RafikiLLMClient
-from voice.tts import EspeakTTS, TextToSpeechError
+from orchestrator.services.llm_client import (
+    LLMClientError,
+    RafikiDecision,
+    RafikiLLMClient,
+)
+from voice.stt import (
+    IPWebcamSpeechToText,
+    PulseSpeechToText,
+    PulseWhisperSpeechToText,
+    SpeechToTextError,
+    VoskSpeechToText,
+)
+from voice.tts import EspeakTTS, PiperTTS, TextToSpeechError
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -19,25 +38,231 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--base-url", default="http://127.0.0.1:8080")
     parser.add_argument("--model", default="rafiki-local")
+    parser.add_argument("--llm-max-tokens", type=int, default=96)
     parser.add_argument("--language", default="fr")
+    parser.add_argument(
+        "--input",
+        choices=["text", "voice", "pulse", "ip-webcam"],
+        default="text",
+    )
+    parser.add_argument("--stt-model", default="models/vosk/fr")
+    parser.add_argument(
+        "--stt-engine",
+        choices=["whisper", "vosk"],
+        default="whisper",
+    )
+    parser.add_argument(
+        "--whisper-model",
+        default="models/whisper/ggml-base-q5_1.bin",
+    )
+    parser.add_argument(
+        "--whisper-executable",
+        default="tools/whisper.cpp/build/bin/whisper-cli",
+    )
+    parser.add_argument("--whisper-threads", type=int, default=4)
+    parser.add_argument("--stt-device")
+    parser.add_argument("--pulse-device", default="@DEFAULT_SOURCE@")
+    parser.add_argument("--pulse-recorder", default="parecord")
+    parser.add_argument(
+        "--stt-audio-filter",
+        default=(
+            "highpass=f=80,"
+            "lowpass=f=7600,"
+            "afftdn=nf=-30,"
+            "volume=0.9"
+        ),
+    )
+    parser.add_argument("--stt-timeout", type=float, default=10.0)
+    parser.add_argument("--stt-phrase-time-limit", type=float, default=8.0)
+    parser.add_argument("--stt-speech-threshold", type=float, default=260.0)
+    parser.add_argument("--stt-end-silence", type=float, default=0.8)
+    parser.add_argument("--ip-webcam-url")
+    parser.add_argument("--ffmpeg-executable", default="ffmpeg")
     parser.add_argument("--no-voice", action="store_true")
     parser.add_argument("--no-fallback", action="store_true")
+    parser.add_argument("--no-start-greeting", action="store_true")
+    parser.add_argument("--tts-engine", choices=["piper", "espeak"], default="piper")
+    parser.add_argument("--piper-executable", default="tools/piper/piper")
+    parser.add_argument(
+        "--piper-model",
+        default="models/piper/siwis/fr_FR-siwis-medium.onnx",
+    )
+    parser.add_argument("--piper-config")
+    parser.add_argument("--piper-length-scale", type=float, default=1.05)
+    parser.add_argument("--piper-noise-scale", type=float, default=0.6)
+    parser.add_argument("--piper-noise-width", type=float, default=0.7)
+    parser.add_argument("--piper-sentence-silence", type=float, default=0.18)
+    parser.add_argument(
+        "--tts-post-filter",
+        default="highpass=f=70,lowpass=f=10500,volume=0.72,alimiter=limit=0.8",
+    )
+    parser.add_argument("--audio-player", default="aplay")
+    parser.add_argument("--audio-device")
+    parser.add_argument(
+        "--body-driver",
+        choices=["none", "log", "arduino", "command"],
+        default="none",
+    )
+    parser.add_argument("--body-port", default="/dev/ttyACM0")
+    parser.add_argument("--body-baudrate", type=int, default=115200)
+    parser.add_argument("--body-timeout", type=float, default=1.0)
+    parser.add_argument("--body-startup-delay", type=float, default=8.0)
+    parser.add_argument("--body-command")
     parser.add_argument("--tts-voice", default="fr-fr")
     parser.add_argument("--tts-speed", type=int, default=155)
     parser.add_argument("--tts-pitch", type=int, default=45)
     return parser
 
 
-def main() -> int:
-    args = build_parser().parse_args()
-    llm_client = RafikiLLMClient(base_url=args.base_url, model=args.model)
-    fallback_client = FallbackRafikiClient()
-    tts = EspeakTTS(
-        voice=args.tts_voice,
-        speed=args.tts_speed,
-        pitch=args.tts_pitch,
+def build_tts(args: argparse.Namespace) -> EspeakTTS | PiperTTS:
+    if args.tts_engine == "espeak":
+        return EspeakTTS(
+            voice=args.tts_voice,
+            speed=args.tts_speed,
+            pitch=args.tts_pitch,
+            enabled=not args.no_voice,
+        )
+
+    return PiperTTS(
+        executable=args.piper_executable,
+        model_path=args.piper_model,
+        config_path=args.piper_config,
+        player=args.audio_player,
+        audio_device=args.audio_device,
+        length_scale=args.piper_length_scale,
+        noise_scale=args.piper_noise_scale,
+        noise_width=args.piper_noise_width,
+        sentence_silence=args.piper_sentence_silence,
+        ffmpeg_executable=args.ffmpeg_executable,
+        post_filter=args.tts_post_filter or None,
         enabled=not args.no_voice,
     )
+
+
+def build_stt(
+    args: argparse.Namespace,
+) -> (
+    VoskSpeechToText
+    | PulseSpeechToText
+    | PulseWhisperSpeechToText
+    | IPWebcamSpeechToText
+):
+    if args.input == "pulse":
+        if args.stt_engine == "whisper":
+            return PulseWhisperSpeechToText(
+                model_path=args.whisper_model,
+                executable=args.whisper_executable,
+                device=args.pulse_device,
+                recorder=args.pulse_recorder,
+                ffmpeg_executable=args.ffmpeg_executable,
+                language=args.language,
+                threads=args.whisper_threads,
+                audio_filter=args.stt_audio_filter or None,
+                speech_threshold=args.stt_speech_threshold,
+                end_silence=args.stt_end_silence,
+            )
+        return PulseSpeechToText(
+            model_path=args.stt_model,
+            device=args.pulse_device,
+            recorder=args.pulse_recorder,
+            ffmpeg_executable=args.ffmpeg_executable,
+            audio_filter=args.stt_audio_filter or None,
+            speech_threshold=args.stt_speech_threshold,
+            end_silence=args.stt_end_silence,
+        )
+
+    if args.input == "ip-webcam":
+        return IPWebcamSpeechToText(
+            audio_url=args.ip_webcam_url or "",
+            model_path=args.stt_model,
+            ffmpeg_executable=args.ffmpeg_executable,
+        )
+
+    return VoskSpeechToText(
+        model_path=args.stt_model,
+        device=args.stt_device,
+    )
+
+
+def build_body(args: argparse.Namespace) -> BodyController:
+    if args.body_driver == "log":
+        return LoggingBodyController()
+
+    if args.body_driver == "arduino":
+        return ArduinoSerialBodyController(
+            port=args.body_port,
+            baudrate=args.body_baudrate,
+            timeout=args.body_timeout,
+            startup_delay=args.body_startup_delay,
+        )
+
+    if args.body_driver == "command":
+        return CommandBodyController(args.body_command or "")
+
+    return NullBodyController()
+
+
+def perform_decision(
+    decision: RafikiDecision,
+    tts: EspeakTTS | PiperTTS,
+    body: BodyController,
+) -> None:
+    print(f"Rafiki > {decision.speech}")
+    print(
+        "Decision:",
+        f"emotion={decision.emotion},",
+        f"movement={decision.movement},",
+        f"screen={decision.screen_mode}",
+    )
+
+    def start_body() -> None:
+        try:
+            body.apply(decision)
+        except BodyControlError as exc:
+            print(f"Rafiki: commande corps impossible: {exc}")
+
+    def stop_body() -> None:
+        try:
+            body.stop_motion()
+        except BodyControlError as exc:
+            print(f"Rafiki: arret du corps impossible: {exc}")
+
+    try:
+        if tts.enabled:
+            tts.speak(
+                decision.speech,
+                on_playback_start=start_body,
+                on_playback_end=stop_body,
+            )
+        else:
+            start_body()
+            stop_body()
+    except TextToSpeechError as exc:
+        print(f"Rafiki: sortie vocale impossible: {exc}")
+        stop_body()
+
+
+def build_opening_decision() -> RafikiDecision:
+    return RafikiDecision(
+        speech="Salut ! Tu veux jouer ou discuter ?",
+        emotion="happy",
+        movement="swing",
+        screen_mode="face",
+        screen_content="",
+    )
+
+
+def main() -> int:
+    args = build_parser().parse_args()
+    llm_client = RafikiLLMClient(
+        base_url=args.base_url,
+        model=args.model,
+        max_tokens=args.llm_max_tokens,
+    )
+    fallback_client = FallbackRafikiClient()
+    tts = build_tts(args)
+    stt = build_stt(args)
+    body = build_body(args)
 
     use_fallback = False
     if llm_client.is_ready():
@@ -50,60 +275,94 @@ def main() -> int:
         print("Rafiki: llama-server n'est pas pret, mode secours active.")
 
     if not args.no_voice and not tts.is_available():
-        print("Rafiki: espeak-ng n'est pas installe, sortie vocale desactivee.")
+        print("Rafiki: moteur vocal indisponible, sortie vocale desactivee.")
         tts.enabled = False
 
-    print("Rafiki: ecris ton message. Tape /quit pour sortir.")
+    if args.input in {"voice", "pulse", "ip-webcam"} and not stt.is_available():
+        print("Rafiki: entree vocale indisponible. Mode texte active.")
+        args.input = "text"
+
+    if not body.is_available():
+        print("Rafiki: corps indisponible, mouvements desactives.")
+        body = NullBodyController()
+    else:
+        try:
+            body.prepare()
+        except BodyControlError as exc:
+            print(f"Rafiki: initialisation du corps impossible: {exc}")
+            body = NullBodyController()
+
+    if args.input in {"voice", "pulse", "ip-webcam"}:
+        print("Rafiki: parle apres le signal. Dis /quit ou Ctrl+C pour sortir.")
+    else:
+        print("Rafiki: ecris ton message. Tape /quit pour sortir.")
+
     history: list[dict[str, str]] = []
 
-    while True:
+    try:
         try:
-            user_message = input("Toi > ").strip()
-        except (EOFError, KeyboardInterrupt):
+            if not args.no_start_greeting:
+                perform_decision(build_opening_decision(), tts, body)
+
+            while True:
+                try:
+                    if args.input in {"voice", "pulse", "ip-webcam"}:
+                        print("Toi > j'ecoute...")
+                        user_message = stt.listen_once(
+                            timeout=args.stt_timeout,
+                            phrase_time_limit=args.stt_phrase_time_limit,
+                        )
+                        print(f"Toi > {user_message}")
+                    else:
+                        user_message = input("Toi > ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    print()
+                    break
+                except SpeechToTextError as exc:
+                    print(f"Rafiki: je n'ai pas bien entendu: {exc}")
+                    continue
+
+                if user_message.lower() in {"/quit", "/exit", "quit", "exit"}:
+                    break
+
+                if not user_message:
+                    continue
+
+                client = fallback_client if use_fallback else llm_client
+
+                try:
+                    decision = client.generate(
+                        user_message,
+                        language=args.language,
+                        history=history,
+                    )
+                except LLMClientError as exc:
+                    if args.no_fallback:
+                        print(f"Rafiki: erreur LLM: {exc}")
+                        continue
+
+                    use_fallback = True
+                    decision = fallback_client.generate(
+                        user_message,
+                        language=args.language,
+                    )
+
+                perform_decision(decision, tts, body)
+
+                history.extend(
+                    [
+                        {"role": "user", "content": user_message},
+                        {"role": "assistant", "content": decision.model_dump_json()},
+                    ]
+                )
+        except KeyboardInterrupt:
             print()
-            break
-
-        if user_message.lower() in {"/quit", "/exit", "quit", "exit"}:
-            break
-
-        if not user_message:
-            continue
-
-        client = fallback_client if use_fallback else llm_client
-
+    finally:
         try:
-            decision = client.generate(
-                user_message,
-                language=args.language,
-                history=history,
-            )
-        except LLMClientError as exc:
-            if args.no_fallback:
-                print(f"Rafiki: erreur LLM: {exc}")
-                continue
-
-            use_fallback = True
-            decision = fallback_client.generate(user_message, language=args.language)
-
-        print(f"Rafiki > {decision.speech}")
-        print(
-            "Decision:",
-            f"emotion={decision.emotion},",
-            f"movement={decision.movement},",
-            f"screen={decision.screen_mode}",
-        )
-
-        try:
-            tts.speak(decision.speech)
-        except TextToSpeechError as exc:
-            print(f"Rafiki: sortie vocale impossible: {exc}")
-
-        history.extend(
-            [
-                {"role": "user", "content": user_message},
-                {"role": "assistant", "content": decision.model_dump_json()},
-            ]
-        )
+            body.stop_motion()
+        except BodyControlError as exc:
+            print(f"Rafiki: arret du corps impossible: {exc}")
+        body.close()
 
     print("Rafiki: a bientot !")
     return 0
