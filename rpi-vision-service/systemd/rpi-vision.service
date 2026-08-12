@@ -1,0 +1,17 @@
+[Unit]
+Description=Raspberry Pi Vision Capture Microservice for LLM Vision Tools
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/rpi-vision-service
+ExecStart=/usr/bin/python3 run_server.py --camera-type auto --port 8000
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+SupplementaryGroups=video render
+
+[Install]
+WantedBy=multi-user.target

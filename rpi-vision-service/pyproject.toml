@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rpi-vision-service"
+version = "1.0.0"
+description = "Raspberry Pi Vision Capture Microservice for LLM Vision Tools"
+readme = "README.md"
+authors = [{ name = "Raspberry Pi Vision Dev" }]
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.22.0",
+    "opencv-python-headless>=4.8.0",
+    "pillow>=10.0.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "requests>=2.31.0",
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+picam = ["picamera2"]
+
+[tool.setuptools.packages.find]
+where = ["."]
